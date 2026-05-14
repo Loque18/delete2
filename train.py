@@ -79,6 +79,7 @@ def train():
         ent_coef="auto",
         verbose=1,
         tensorboard_log="./logs/tensorboard/",
+        device="cuda"
     )
 
     # ==================================================
