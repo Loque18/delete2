@@ -7,7 +7,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from epuck_env import EpuckEnv
+from delete2.epuck_env import EpuckEnv
 
 
 def make_env():
