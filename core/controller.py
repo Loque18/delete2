@@ -9,9 +9,6 @@ from scripts.classes import (FMS_STATEV2, FrameCounter, Logger, Perception, Sens
 from scripts.utils import (clamp, angle_diff, rad2Deg, deg2rad, safe_sensor, distance)
 from scripts.constants import ANGLE_ERR_MARGIN, BASE_SPEED, TARGET_DIST
 
-
-
-
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # TYPES
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -71,7 +68,7 @@ class Controller_c:
         # --------------------
         self.manual_mode = True
 
-        # self.model = SAC.load("./models/sac_epuck_final.zip", device="cpu")
+        self.model = SAC.load("./models/sac_epuck_final.zip", device="cuda")
 
         # ------------------------------
         # anti-loop / hysteresis memory
@@ -316,7 +313,61 @@ class Controller_c:
             return vl, vr
         return vr, vl
     
+    def _get_obs(self, robot, goal):
 
+        sensor_values = []
+
+        for sensor in self.robot.prox_sensors:
+            if sensor.reading < 0:
+                value = 0.0
+            else:
+                value = 1.0 - (sensor.reading / sensor.max_range)
+                value = np.clip(value, 0.0, 1.0)
+
+
+            sensor_values.append(value)
+
+
+        dx = goal[0] - robot.x
+        dy = goal[1] - robot.y
+
+        dist = np.sqrt(dx**2 + dy**2)
+        max_dist = np.sqrt(2.0) * self.arena_size
+        dist_norm = np.clip(dist / max_dist, 0.0, 1.0)
+
+
+        goal_angle = np.arctan2(dy, dx)
+        relative_angle = self._wrap_angle(goal_angle - self.robot.theta)
+
+        obs = np.array(
+            [
+                *sensor_values,
+                dist_norm,
+                np.sin(relative_angle),
+                np.cos(relative_angle)
+            ],
+            dtype=np.float32
+        )
+
+        return obs
+    
+    def _action_to_wheels(self, action):
+        speed = 1.0
+        turn_speed = 0.5
+
+        if action == 0:  # adelante
+            vl, vr = speed, speed
+        elif action == 1:  # atrás
+            vl, vr = -speed, -speed
+        elif action == 2:  # izquierda
+            vl, vr = -turn_speed, turn_speed
+        elif action == 3:  # derecha
+            vl, vr = turn_speed, -turn_speed
+
+        else:
+            raise ValueError(f"Acción inválida: {action}")
+        
+        return vl, vr
     
     # ========================================
     # UPDATES
@@ -331,12 +382,19 @@ class Controller_c:
 
         if self.frame_counter.frame < 3:
             return self._idle()
-        
-     
 
         if self.manual_mode:
             return self.rc_controller(robot)
         
+
+        obs = self._get_obs(robot, goal)
+        action, _ = self.model.predict(obs, deterministic=True)
+
+
+        vl, vr = self._action_to_wheels(action)
+
+        return vl, vr
+
         # --------------------------------------------------
         # PERCEPTION AND INTERPRETATION
         # --------------------------------------------------
@@ -367,184 +425,6 @@ class Controller_c:
         if robot.desire == 1.0:
             self.state = FMS_STATEV2.DONE
 
-        # --------------------------------------------------
-        # counters for hysteresis
-        # --------------------------------------------------
-        if self.perc_state == Perception.FRONT_BLOCKED:
-            self.front_blocked_count += 1
-        else:
-            self.front_blocked_count = 0
-
-        if self.perc_state == Perception.FREE_PATH:            
-            val = self.memory.get("front_clear_count") 
-            self.memory.set("front_clear_count", val + 1)
-        else:
-            self.memory.set("front_clear_count", 0)
-
-
-        # if self.is_front_soft_blocked(front, front_left, front_right, threshold=11.0):
-        #     self.front_blocked_count += 1
-        # else:
-        #     self.front_blocked_count = 0
-
-        if self.is_left_wall_lost(front_left, left, back_left):
-            self.wall_lost_count += 1
-        else:
-            self.wall_lost_count = 0
-
-        if self.left_wall_visible(front_left, left, back_left):
-            self.rehook_seen_count += 1
-        else:
-            self.rehook_seen_count = 0
-
-
-
-        # --------------------------------------------------
-        # security check
-        # --------------------------------------------------
-        obstacle_front = self.perc_state == Perception.FRONT_BLOCKED
-
-
-
-
-
-
-        # --------------------------------------------------
-        # STATE MACHINE (hierarchical)
-        # --------------------------------------------------
-        match self.state:
-
-            case FMS_STATEV2.START:
-                self.store_initial_state(robot, goal)
-                self.state = FMS_STATEV2.GO_TO_GOAL
-                vl, vr = self._idle()      
-
-            
-            case FMS_STATEV2.IDLE | FMS_STATEV2.DONE:                
-                vl, vr = self._idle()          
-
-            case FMS_STATEV2.GO_TO_GOAL:
-
-                # get angle to goal
-                target_x, target_y, _ = goal                 
-                target_angle = atan2(target_y - current_y, target_x - current_x)
-                angle_to_target = angle_diff(target_angle, current_theta)
-
-                # if angle to target is large, rotate until heading it 
-                if abs(angle_to_target) > ANGLE_ERR_MARGIN:
-                    self.start_turn(
-                        robot,
-                        direction=1 if angle_to_target > 0 else -1, 
-                        target_angle=target_angle,                        
-                        state_after=FMS_STATEV2.GO_TO_GOAL
-                    )
-                    vl, vr = self._idle()
-                else:
-                    vl, vr = self._go_forward(speed=BASE_SPEED)
-
-                # if front blockend and close to obstacle, switch to wall follow
-                if self.perc_state == Perception.FRONT_BLOCKED and self.front_blocked_count > 3 and front <= TARGET_DIST:
-                    # self.state = FMS_STATEV2.EXPLORE_OBSTACLE
-                    self.store_hit_point(robot, goal)
-                    self.start_turn(
-                        robot, 
-                        direction=1 if angle_to_target > 0 else -1, 
-                        target_angle=current_theta - deg2rad(90), 
-                        state_after=FMS_STATEV2.FOLLOW_WALL
-                    )                    
-                    vl, vr = self._idle()
-
-
-                
-                if self.perc_state == Perception.WALL_RIGHT and min(front_right, right) <= 1.5 and self.state_timer > 10:
-                    self.store_hit_point(robot, goal)
-                    self.start_turn(
-                        robot, 
-                        direction=-1, 
-                        target_angle=current_theta + deg2rad(180), 
-                        state_after=FMS_STATEV2.FOLLOW_WALL
-                    )                    
-                    vl, vr = self._idle()
-                
-
-            case FMS_STATEV2.ROTATE:
-                angle_to_target = angle_diff(self.turn_target, current_theta)
-
-                max_turn = 0.80
-                min_turn = 0.18
-                k_rot = 1.25
-
-                if abs(angle_to_target) < ANGLE_ERR_MARGIN:
-                    self.state = self.state_after
-                    self.state_timer = 0
-                    vl, vr = self._idle()
-                else:
-                    rot = k_rot * angle_to_target
-
-                    if abs(rot) < min_turn:
-                        rot = min_turn if rot > 0 else -min_turn
-
-                    rot = clamp(rot, -max_turn, max_turn)
-                    vl = -rot
-                    vr = rot
-
-            case FMS_STATEV2.FOLLOW_WALL:
-                
-                # get angle to goal
-                target_x, target_y, _ = goal
-                target_angle = atan2(target_y - current_y, target_x - current_x)
-                angle_to_target = angle_diff(target_angle, current_theta)
-
-                # if collision unavoidable, do a turn in place to try to find a new path
-                if self.perc_state == Perception.FRONT_BLOCKED and self.front_blocked_count > 3 and front <= TARGET_DIST:
-                    self.start_turn(
-                        robot,
-                        direction=1,
-                        target_angle=current_theta - deg2rad(90),
-                        state_after=FMS_STATEV2.FOLLOW_WALL                        
-                    )
-
-
-                vl, vr = self.wall_follow_left(
-                    front_left=front_left,
-                    left=left,
-                    back_left=back_left,
-                    target_dist=TARGET_DIST,
-                    base_speed=BASE_SPEED
-                )
-
-
-                # get distance to goal from initial hit point and current position
-                initial_dist = self.memory.get("hit_point_dist")
-                curr_dist = distance(current_x, current_y, target_x, target_y)
-
-                _is_closer_than_initial = curr_dist < initial_dist
-                _is_on_line = self.is_on_line(robot)
-                _has_enough_time = self.state_timer > 10
-
-                # if the robot is on the line to the goal and has been following the wall and is closer to the goal than when it hit the wall
-                # try to go to the goal again
-                if _is_on_line and _has_enough_time and _is_closer_than_initial:
-                    self.state = FMS_STATEV2.GO_TO_GOAL
-                    self.state_timer = 0
-                    vl, vr = self._idle()
-
-
-                # if lost count is high start seeking the goal again
-                if self.wall_lost_count > 100:
-                    self.state = FMS_STATEV2.GO_TO_GOAL
-                    self.state_timer = 0
-                    return self._idle()
-
-
-                # 1. Si pierde la pared, buscar suavemente hacia la izquierda
-                if self.wall_lost_count > 2:                   
-                    return self._1w_rotate(direction=1, speed=0.45, radius=1.5)
-
-
-        logger.log(f"Perc: {self.perc_state.name} | FSM: {self.state.name}  | front: {front:.2f}  ")
-            
-        return vl, vr
     
 
 

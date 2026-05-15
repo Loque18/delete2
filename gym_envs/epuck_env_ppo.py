@@ -127,6 +127,10 @@ class EpuckEnv(gym.Env):
 
 
         progress = old_dist - new_dist
+
+        if abs(progress) < 0.01:
+            reward -= 0.02
+
         reward = 2.0 * progress
         reward -= 0.01
 
