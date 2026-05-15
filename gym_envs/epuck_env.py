@@ -127,7 +127,7 @@ class EpuckEnv(gym.Env):
         reward -= 0.01
 
         obs = self._get_obs()
-        front_danger = max(obs[0], obs[1], obs[6], obs[7])
+        front_danger = float(max(obs[0], obs[1], obs[6], obs[7]))
         reward -= 1.0 * front_danger
 
         if collided:
@@ -157,7 +157,7 @@ class EpuckEnv(gym.Env):
 
         self.prev_dist_to_goal = new_dist
 
-        return obs, reward, terminated, truncated, info
+        return obs, float(reward), terminated, truncated, info
     
     def render(self):
         if self.renderer is None:
