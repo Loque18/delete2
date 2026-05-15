@@ -17,6 +17,7 @@ def record_video():
     obs, info = env.reset()
 
     frame = env.render()
+    print("Frame shape:", frame)
     h, w, _ = frame.shape
 
     writer = cv2.VideoWriter(
