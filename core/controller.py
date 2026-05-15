@@ -3,7 +3,7 @@ from typing import Tuple, List
 import numpy as np
 import keyboard
 
-from stable_baselines3 import SAC
+from stable_baselines3 import PPO
 
 from delete2.core.classes import (FMS_STATEV2, FrameCounter, Logger, Perception, SensorMemory, KVMemory)
 from delete2.core.utils import (clamp, angle_diff, rad2Deg, deg2rad, safe_sensor, distance)
@@ -68,7 +68,7 @@ class Controller_c:
         # --------------------
         self.manual_mode = False
 
-        self.model = SAC.load("./models/sac_epuck_final.zip", device="cuda")
+        self.model = PPO.load("./models/ppo_epuck_final.zip", device="cuda")
 
         # ------------------------------
         # anti-loop / hysteresis memory
@@ -397,7 +397,7 @@ class Controller_c:
         action, _ = self.model.predict(obs, deterministic=True)
 
 
-        vl, vr = action[0], action[1]
+        vl, vr = self._action_to_wheels(action)
 
         return vl, vr
 
