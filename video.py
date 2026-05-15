@@ -6,13 +6,13 @@ from gym_envs.epuck_env_sac import EpuckEnv
 
 
 def record_video():
-    model_path = "./models/ppo_epuck_final.zip"
-    output_path = "./videos/ppo_epuck_final.mp4"
+    model_path = "./models/sac_epuck_final.zip"
+    output_path = "./videos/sac_epuck_final.mp4"
 
     os.makedirs("./videos", exist_ok=True)
 
     env = EpuckEnv(render_mode="rgb_array")
-    model = PPO.load(model_path, device="cuda")  # en tu VM
+    model = SAC.load(model_path, device="cuda")  # en tu VM
 
     obs, info = env.reset()
 
