@@ -117,19 +117,24 @@ class EpuckEnv(gym.Env):
 
 
         progress = old_dist - new_dist
-        reward = 5.0 * progress
+
+        reward = 2.0 * progress
         reward -= 0.01
 
+        obs = self._get_obs()
+        front_danger = max(obs[0], obs[1], obs[6], obs[7])
+        reward -= 1.0 * front_danger
+
         if collided:
-            reward -= 5.0
+            reward -= 30.0
 
         if out_of_bounds:
-            reward -= 20.0
+            reward -= 30.0
 
         if reached_goal:
             reward += 100.0
 
-        terminated = bool(reached_goal or out_of_bounds)
+        terminated = bool(reached_goal or out_of_bounds or collided)
         truncated = bool(timout and not terminated)
 
 
