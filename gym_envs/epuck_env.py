@@ -163,7 +163,7 @@ class EpuckEnv(gym.Env):
         return obs, reward, terminated, truncated, info
     
     def render(self):
-        if self.render_mode != "human" or self.renderer is None:
+        if self.renderer is None:
             return None
 
         assert self.robot is not None
@@ -174,10 +174,11 @@ class EpuckEnv(gym.Env):
             goal=self.goal
         )
 
-        self.renderer.show(frame, delay_ms=1)
+        if self.render_mode == "human":
+            self.renderer.show(frame, delay_ms=1)
 
         return frame
-    
+        
     def close(self):
         if self.renderer is not None and hasattr(self.renderer, "close"):
             self.renderer.close()
