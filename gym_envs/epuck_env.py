@@ -176,7 +176,7 @@ class EpuckEnv(gym.Env):
 
         self.renderer.show(frame, delay_ms=1)
 
-        return None
+        return frame
     
     def close(self):
         if self.renderer is not None and hasattr(self.renderer, "close"):

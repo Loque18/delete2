@@ -3,9 +3,13 @@ from typing import Tuple, List
 import numpy as np
 import keyboard
 
+from stable_baselines3 import SAC
+
 from scripts.classes import (FMS_STATEV2, FrameCounter, Logger, Perception, SensorMemory, KVMemory)
 from scripts.utils import (clamp, angle_diff, rad2Deg, deg2rad, safe_sensor, distance)
 from scripts.constants import ANGLE_ERR_MARGIN, BASE_SPEED, TARGET_DIST
+
+
 
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,6 +71,8 @@ class Controller_c:
         # --------------------
         self.manual_mode = True
 
+        self.model = SAC.load("./models/sac_epuck_final.zip", device="cpu")
+
         # ------------------------------
         # anti-loop / hysteresis memory
         # ------------------------------
@@ -83,6 +89,43 @@ class Controller_c:
         self.state_timer = 0
         self.state = FMS_STATEV2.START 
         self.perc_state = Perception.UNKNOWN
+
+
+    def build_observation(self, robot, goal):
+        # =========================
+        # SENSORES
+        # =========================
+        sensors = np.array(robot.sensor_distances, dtype=np.float32)
+
+        # normalizar
+        sensors = sensors / robot.sensor_range
+
+        # =========================
+        # GOAL
+        # =========================
+        dx = goal[0] - robot.x
+        dy = goal[1] - robot.y
+
+        distance = np.sqrt(dx**2 + dy**2)
+
+        goal_angle = np.arctan2(dy, dx) - robot.theta
+
+        # wrap angle
+        goal_angle = np.arctan2(
+            np.sin(goal_angle),
+            np.cos(goal_angle)
+        )
+
+        # normalizaciones
+        distance = distance / 200.0
+        goal_angle = goal_angle / np.pi
+
+        obs = np.concatenate([
+            sensors,
+            [distance, goal_angle]
+        ]).astype(np.float32)
+
+        return obs
 
   
     # ========================================
@@ -293,6 +336,16 @@ class Controller_c:
 
         if self.manual_mode:
             return self.rc_controller(robot)
+        
+
+        obs = self.build_observation(robot, goal)
+
+        action, _ = self.model.predict(obs, deterministic=True)
+
+        vl = action[0]
+        vr = action[1]
+
+        return vl, vr
         
         # --------------------------------------------------
         # PERCEPTION AND INTERPRETATION
