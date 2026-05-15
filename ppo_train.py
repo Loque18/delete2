@@ -68,14 +68,14 @@ def train():
         clip_range=0.2,
         verbose=1,
         tensorboard_log="./logs/tensorboard/",
-        device="cuda"
+        # device="cuda"
     )
 
     # ==================================================
     # TRAIN
     # ==================================================
     model.learn(
-        total_timesteps=200_000,
+        total_timesteps=500_000,
         callback=[checkpoint_callback, eval_callback],
         progress_bar=True
     )

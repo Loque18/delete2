@@ -101,7 +101,7 @@ class EpuckEnv(gym.Env):
 
         self.step_count += 1
 
-        vl, vr = self.action_to_wheels(action)
+        vl, vr = self._action_to_wheels(action)
 
         old_dist = self._distance_to_goal()
 
@@ -256,9 +256,9 @@ class EpuckEnv(gym.Env):
         )
     
 
-    def action_to_wheels(self, action):
-        speed = 0.6
-        turn_speed = 0.4
+    def _action_to_wheels(self, action):
+        speed = 1.0
+        turn_speed = 0.5
 
         if action == 0:  # adelante
             vl, vr = speed, speed
