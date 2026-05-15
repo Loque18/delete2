@@ -55,8 +55,8 @@ class EpuckEnv(gym.Env):
 
         # action space
         self.action_space = spaces.Box(
-            low=[-1.0, -1.0],
-            high=[1.0, 1.0],
+            low=np.array([-1.0, -1.0], dtype=np.float32),
+            high=np.array([1.0, 1.0], dtype=np.float32),
             shape=(2,),
             dtype=np.float32
         )
