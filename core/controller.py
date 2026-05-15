@@ -313,11 +313,15 @@ class Controller_c:
             return vl, vr
         return vr, vl
     
+
+    def _wrap_angle(self, angle):
+        return np.arctan2(np.sin(angle), np.cos(angle))
+    
     def _get_obs(self, robot, goal):
 
         sensor_values = []
 
-        for sensor in self.robot.prox_sensors:
+        for sensor in robot.prox_sensors:
             if sensor.reading < 0:
                 value = 0.0
             else:
@@ -337,7 +341,7 @@ class Controller_c:
 
 
         goal_angle = np.arctan2(dy, dx)
-        relative_angle = self._wrap_angle(goal_angle - self.robot.theta)
+        relative_angle = self._wrap_angle(goal_angle - robot.theta)
 
         obs = np.array(
             [
