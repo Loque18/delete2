@@ -2,7 +2,7 @@ import os
 import cv2
 from stable_baselines3 import SAC
 
-from delete2.epuck_env import EpuckEnv
+from delete2.gym_envs.epuck_env import EpuckEnv
 
 
 def record_video():
