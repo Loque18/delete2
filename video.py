@@ -28,7 +28,7 @@ def record_video():
 
     done = False
     step = 0
-    max_steps = 1000
+    max_steps = 2000
 
     print('recording video...')
 
