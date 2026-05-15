@@ -4,7 +4,7 @@ from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 
-from gym_envs.epuck_env_sac import EpuckEnv
+from gym_envs.epuck_env_ppo import EpuckEnv
 
 def make_env():
     env = EpuckEnv(render_mode=None)
@@ -68,7 +68,7 @@ def train():
         clip_range=0.2,
         verbose=1,
         tensorboard_log="./logs/tensorboard/",
-        # device="cuda"
+        device="cpu"
     )
 
     # ==================================================

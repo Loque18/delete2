@@ -68,7 +68,7 @@ class Controller_c:
         # --------------------
         self.manual_mode = False
 
-        self.model = PPO.load("./models/ppo_epuck_final.zip", device="cuda")
+        self.model = PPO.load("./models/ppo_epuck_final.zip", device="cpu")
 
         # ------------------------------
         # anti-loop / hysteresis memory
