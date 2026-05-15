@@ -41,6 +41,12 @@ def record_video():
         frame = env.render()
         writer.write(frame)
 
+        if terminated or truncated:
+            print("EPISODE END")
+            print("terminated:", terminated)
+            print("truncated:", truncated)
+            print("info:", info)
+
         step += 1
 
     writer.release()

@@ -16,6 +16,10 @@ from core.renderer import Cv2Renderer
 
 from scenes.scene_1 import simple_center_obstacle
 
+class EnvCtx:
+    def distance_to_goal(): 
+        pass 
+
 class EpuckEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
@@ -116,9 +120,9 @@ class EpuckEnv(gym.Env):
         timout = self.step_count >= self.max_steps
 
 
-        progress = old_dist - new_dist
+        # progress = old_dist - new_dist
 
-        reward = 2.0 * progress
+        # reward = 2.0 * progress
         reward -= 0.01
 
         obs = self._get_obs()
@@ -126,7 +130,7 @@ class EpuckEnv(gym.Env):
         reward -= 1.0 * front_danger
 
         if collided:
-            reward -= 30.0
+            reward -= 50.0
 
         if out_of_bounds:
             reward -= 30.0
