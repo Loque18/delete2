@@ -36,7 +36,8 @@ class Cv2Renderer:
 
         self.colors = {
             "background": (255, 255, 255),
-            "walls": (252, 186, 3)
+            "walls": (252, 186, 3),
+            "text": (138, 142, 153)
         }
 
     def world_to_screen(self, x: float, y: float) -> Tuple[int, int]:
@@ -104,7 +105,7 @@ class Cv2Renderer:
                     (8, y),
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.45,
-                    (255, 255, 255),
+                    self.colors["text"],
                     1,
                     cv2.LINE_AA,
                 )

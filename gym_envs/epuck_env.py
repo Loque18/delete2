@@ -14,6 +14,8 @@ from gymnasium import spaces
 from core.sim import Robot_c, Obstacle_c, Obstacle_wall, crear_paredes_v2
 from core.renderer import Cv2Renderer
 
+from scenes.scene_1 import simple_center_obstacle
+
 class EpuckEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
@@ -43,12 +45,7 @@ class EpuckEnv(gym.Env):
         self.prev_dist_to_goal = 0.0
 
         # action space
-        self.action_space = spaces.Box(
-            low=np.array([-1.0, -1.0], dtype=np.float32),
-            high=np.array([1.0, 1.0], dtype=np.float32),
-            shape=(2,),
-            dtype=np.float32
-        )
+        self.action_space = gym.spaces.Discrete(4)
 
         # 8 sensors + x,y,theta al objetivo
         self.observation_space = spaces.Box(
@@ -87,14 +84,7 @@ class EpuckEnv(gym.Env):
             objetivo=[self.goal[0], self.goal[1], self.goal[2]]
         )
 
-        self.obstacles = [
-            Obstacle_c(
-                x_prop=self.arena_size / 2,
-                y_prop=self.arena_size / 2,
-                arena_size=int(self.arena_size),
-                radius=self.obstacle_radius
-            )
-        ]
+        self.obstacles = simple_center_obstacle(arena_size=self.arena_size, obstacle_radius=self.obstacle_radius)
 
         self._update_robot_sensors_and_collisions()
 
@@ -111,10 +101,7 @@ class EpuckEnv(gym.Env):
 
         self.step_count += 1
 
-        action = np.asarray(action, dtype=np.float32)
-        action = np.clip(action, self.action_space.low, self.action_space.high)
-
-        vl, vr = float(action[0]), float(action[1])
+        vl, vr = self.action_to_wheels(action)
 
         old_dist = self._distance_to_goal()
 
@@ -262,6 +249,25 @@ class EpuckEnv(gym.Env):
             r <= self.robot.x <= self.arena_size - r and
             r <= self.robot.y <= self.arena_size - r
         )
+    
+
+    def action_to_wheels(self, action):
+        speed = 0.6
+        turn_speed = 0.4
+
+        if action == 0:  # adelante
+            vl, vr = speed, speed
+        elif action == 1:  # atrás
+            vl, vr = -speed, -speed
+        elif action == 2:  # izquierda
+            vl, vr = -turn_speed, turn_speed
+        elif action == 3:  # derecha
+            vl, vr = turn_speed, -turn_speed
+
+        else:
+            raise ValueError(f"Acción inválida: {action}")
+        
+        return vl, vr
     
     @staticmethod
     def _wrap_angle(angle: float) -> float:

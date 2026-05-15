@@ -71,7 +71,7 @@ class Controller_c:
         # --------------------
         self.manual_mode = True
 
-        self.model = SAC.load("./models/sac_epuck_final.zip", device="cpu")
+        # self.model = SAC.load("./models/sac_epuck_final.zip", device="cpu")
 
         # ------------------------------
         # anti-loop / hysteresis memory
@@ -336,16 +336,6 @@ class Controller_c:
 
         if self.manual_mode:
             return self.rc_controller(robot)
-        
-
-        obs = self.build_observation(robot, goal)
-
-        action, _ = self.model.predict(obs, deterministic=True)
-
-        vl = action[0]
-        vr = action[1]
-
-        return vl, vr
         
         # --------------------------------------------------
         # PERCEPTION AND INTERPRETATION
