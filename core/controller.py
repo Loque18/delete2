@@ -358,8 +358,11 @@ class Controller_c:
         return obs
     
     def _action_to_wheels(self, action):
-        speed = 1.0
-        turn_speed = 0.5
+        speed = 2.0
+        turn_speed = 0.75
+
+        action = int(action)
+
 
         if action == 0:  # adelante
             vl, vr = speed, speed
