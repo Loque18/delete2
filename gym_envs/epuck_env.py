@@ -59,7 +59,7 @@ class EpuckEnv(gym.Env):
         )
 
         self.renderer = None
-        if self.render_mode == "human":
+        if self.render_mode == "human" or self.render_mode == "rgb_array":
             self.renderer = Cv2Renderer(
                 arena_size=self.arena_size,
                 scale=4,
