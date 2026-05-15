@@ -9,7 +9,7 @@ from core.renderer import Cv2Renderer
 from core.controller import Controller_c
 from core.sim import Robot_c
 
-from scenes.scene_1 import simple_center_obstacle, scene2, scene3
+from scenes.scene_1 import simple_center_obstacle, scene2, scene3, scene5
 
 
 @dataclass
@@ -56,7 +56,7 @@ class RobotEnv:
 
         self.robot.theta = theta
 
-        self.obstacles = scene3(arena_size=self.config.arena_size, wall_thickness=2)
+        self.obstacles = scene5(arena_size=self.config.arena_size)
 
         self.path = [(self.robot.x, self.robot.y)]
         self.step_count = 0

@@ -14,7 +14,12 @@ from gymnasium import spaces
 from core.sim import Robot_c, Obstacle_c, Obstacle_wall, crear_paredes_v2
 from core.renderer import Cv2Renderer
 
-from scenes.scene_1 import  scene2
+from scenes.scene_1 import   scene2, scene3, scene4, scene5
+
+def pick_random_scene(arena_size=200):
+    scenes = [ scene2, scene3, scene4, scene5]
+    scene_fn = np.random.choice(scenes)
+    return scene_fn(arena_size=arena_size, wall_thickness=2)
 
 class EnvCtx:
     def distance_to_goal(): 
@@ -88,7 +93,7 @@ class EpuckEnv(gym.Env):
             objetivo=[self.goal[0], self.goal[1], self.goal[2]]
         )
 
-        self.obstacles = scene2(arena_size=self.arena_size)
+        self.obstacles = pick_random_scene(arena_size=self.arena_size)
 
         self._update_robot_sensors_and_collisions()
 
