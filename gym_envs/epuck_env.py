@@ -180,9 +180,8 @@ class EpuckEnv(gym.Env):
         return frame
         
     def close(self):
-        if self.renderer is not None and hasattr(self.renderer, "close"):
+        if self.render_mode == "human" and self.renderer is not None:
             self.renderer.close()
-
 
     def _update_robot_sensors_and_collisions(self):
         assert self.robot is not None
