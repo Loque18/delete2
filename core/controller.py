@@ -66,7 +66,7 @@ class Controller_c:
         # --------------------
         # modes
         # --------------------
-        self.manual_mode = True
+        self.manual_mode = False
 
         self.model = SAC.load("./models/sac_epuck_final.zip", device="cuda")
 
