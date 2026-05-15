@@ -2,7 +2,7 @@ import os
 import cv2
 from stable_baselines3 import SAC, PPO
 
-from gym_envs.epuck_env import EpuckEnv
+from gym_envs.epuck_env_sac import EpuckEnv
 
 
 def record_video():
