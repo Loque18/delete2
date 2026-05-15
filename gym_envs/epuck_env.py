@@ -14,7 +14,7 @@ from gymnasium import spaces
 from core.sim import Robot_c, Obstacle_c, Obstacle_wall, crear_paredes_v2
 from core.renderer import Cv2Renderer
 
-from scenes.scene_1 import simple_center_obstacle
+from scenes.scene_1 import  scene3
 
 class EnvCtx:
     def distance_to_goal(): 
@@ -88,7 +88,7 @@ class EpuckEnv(gym.Env):
             objetivo=[self.goal[0], self.goal[1], self.goal[2]]
         )
 
-        self.obstacles = simple_center_obstacle(arena_size=self.arena_size, obstacle_radius=self.obstacle_radius)
+        self.obstacles = scene3(arena_size=self.arena_size)
 
         self._update_robot_sensors_and_collisions()
 
