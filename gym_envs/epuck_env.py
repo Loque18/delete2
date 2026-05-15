@@ -120,10 +120,8 @@ class EpuckEnv(gym.Env):
         timout = self.step_count >= self.max_steps
 
 
-        # progress = old_dist - new_dist
-
-        # reward = 2.0 * progress
-        reward = float(0.0)
+        progress = old_dist - new_dist
+        reward = 2.0 * progress
         reward -= 0.01
 
         obs = self._get_obs()
