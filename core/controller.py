@@ -87,6 +87,8 @@ class Controller_c:
         self.state = FMS_STATEV2.START 
         self.perc_state = Perception.UNKNOWN
 
+        self.arena_size = 200.0
+
 
     def build_observation(self, robot, goal):
         # =========================
