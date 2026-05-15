@@ -399,6 +399,8 @@ class Controller_c:
         obs = self._get_obs(robot, goal)
         action, _ = self.model.predict(obs, deterministic=True)
 
+        print("ACTION:", action, type(action), np.asarray(action).shape)
+
 
         vl, vr = self._action_to_wheels(action)
 
