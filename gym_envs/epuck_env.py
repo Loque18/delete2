@@ -123,7 +123,7 @@ class EpuckEnv(gym.Env):
         # progress = old_dist - new_dist
 
         # reward = 2.0 * progress
-        reward = 0.0
+        reward = float(0.0)
         reward -= 0.01
 
         obs = self._get_obs()
