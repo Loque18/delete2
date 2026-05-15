@@ -5,9 +5,9 @@ import keyboard
 
 from stable_baselines3 import SAC
 
-from scripts.classes import (FMS_STATEV2, FrameCounter, Logger, Perception, SensorMemory, KVMemory)
-from scripts.utils import (clamp, angle_diff, rad2Deg, deg2rad, safe_sensor, distance)
-from scripts.constants import ANGLE_ERR_MARGIN, BASE_SPEED, TARGET_DIST
+from core.classes import (FMS_STATEV2, FrameCounter, Logger, Perception, SensorMemory, KVMemory)
+from core.utils import (clamp, angle_diff, rad2Deg, deg2rad, safe_sensor, distance)
+from core.constants import ANGLE_ERR_MARGIN, BASE_SPEED, TARGET_DIST
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # TYPES
