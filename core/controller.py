@@ -397,7 +397,7 @@ class Controller_c:
         action, _ = self.model.predict(obs, deterministic=True)
 
 
-        vl, vr = self._action_to_wheels(action)
+        vl, vr = action[0], action[1]
 
         return vl, vr
 
