@@ -2,7 +2,6 @@
 # IMPORTS
 # ==================================================
 
-
 from typing import Optional, Tuple, List, Any
 
 # third party
@@ -14,30 +13,37 @@ from gymnasium import spaces
 from core.sim import Robot_c, Obstacle_c, Obstacle_wall, crear_paredes_v2
 from core.renderer import Cv2Renderer
 
-from scenes.scene_1 import   scene2, scene3, scene4, scene5
+from scenes.scene_1 import scene2, scene3, scene4, scene5
+
 
 def pick_random_scene(arena_size=200):
-    scenes = [ scene2, scene3, scene5]
+    scenes = [scene2, scene3, scene5]
     scene_fn = np.random.choice(scenes)
     return scene_fn(arena_size=arena_size, wall_thickness=2)
 
+
 class EnvCtx:
-    def distance_to_goal(): 
-        pass 
+    def distance_to_goal():
+        pass
+
 
 class EpuckEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 30}
 
     def __init__(
-            self,
-            render_mode: Optional[str] = None,
-            arena_size: int = 200,
-            max_steps: int = 1000,
-            goal: Tuple[float, float, float] = (180.0, 180.0, 8.0),
-            robot_start: Tuple[float, float, float] = (25.0, 25.0, np.pi / 4),
-            obstacle_radius: float = 14.0
-        ):
-    
+        self,
+        render_mode: Optional[str] = None,
+        arena_size: int = 200,
+        max_steps: int = 1000,
+        goal: Tuple[float, float, float] = (180.0, 180.0, 8.0),
+        robot_start: Tuple[float, float, float] = (
+            25.0,
+            25.0,
+            np.pi / 4
+        ),
+        obstacle_radius: float = 14.0
+    ):
+
         super().__init__()
 
         self.render_mode = render_mode
@@ -50,13 +56,24 @@ class EpuckEnv(gym.Env):
 
         self.robot: Robot_c | None = None
         self.obstacles: list[Obstacle_c] = []
+
         self.step_count = 0
         self.prev_dist_to_goal = 0.0
 
-        # action space
+        # ==================================================
+        # LOOP DETECTION CONFIG
+        # ==================================================
+        self.position_history = []
+        self.loop_window = 25
+        self.loop_radius = 6.0
+        self.loop_penalty = 0.5
+
+        # ==================================================
+        # ACTION SPACE
+        # ==================================================
         self.action_space = gym.spaces.Discrete(4)
 
-        # 8 sensors + x,y,theta al objetivo
+        # 8 sensors + distance + sin(angle) + cos(angle)
         self.observation_space = spaces.Box(
             low=-1.0,
             high=1.0,
@@ -65,7 +82,8 @@ class EpuckEnv(gym.Env):
         )
 
         self.renderer = None
-        if self.render_mode == "human" or self.render_mode == "rgb_array":
+
+        if self.render_mode in ["human", "rgb_array"]:
             self.renderer = Cv2Renderer(
                 arena_size=self.arena_size,
                 scale=4,
@@ -74,15 +92,21 @@ class EpuckEnv(gym.Env):
                 show_path=True
             )
 
+    # ==================================================
+    # RESET
+    # ==================================================
+
     def reset(
         self,
         *,
         seed: Optional[int] = None,
         options: Optional[dict[str, Any]] = None,
     ):
+
         super().reset(seed=seed)
 
         self.step_count = 0
+        self.position_history = []
 
         x, y, theta = self.robot_start
 
@@ -90,10 +114,16 @@ class EpuckEnv(gym.Env):
             x=x,
             y=y,
             theta=theta,
-            objetivo=[self.goal[0], self.goal[1], self.goal[2]]
+            objetivo=[
+                self.goal[0],
+                self.goal[1],
+                self.goal[2]
+            ]
         )
 
-        self.obstacles = pick_random_scene(arena_size=self.arena_size)
+        self.obstacles = pick_random_scene(
+            arena_size=self.arena_size
+        )
 
         self._update_robot_sensors_and_collisions()
 
@@ -103,10 +133,16 @@ class EpuckEnv(gym.Env):
         info = self._get_info()
 
         return obs, info
-    
+
+    # ==================================================
+    # STEP
+    # ==================================================
 
     def step(self, action):
-        assert self.robot is not None, "Robot no inicializado. Llama a reset() primero."
+
+        assert self.robot is not None, (
+            "Robot no inicializado. Llama a reset() primero."
+        )
 
         self.step_count += 1
 
@@ -114,29 +150,88 @@ class EpuckEnv(gym.Env):
 
         old_dist = self._distance_to_goal()
 
+        # mover robot
         self.robot.updatePosition(vl, vr)
+
+        # actualizar sensores y colisiones
         self._update_robot_sensors_and_collisions()
 
         new_dist = self._distance_to_goal()
 
+        # ==================================================
+        # TERMINATION FLAGS
+        # ==================================================
+
         reached_goal = new_dist <= self.goal[2]
         collided = self.robot.stall == 1
         out_of_bounds = not self._inside_arena()
-        timout = self.step_count >= self.max_steps
+        timeout = self.step_count >= self.max_steps
 
+        # ==================================================
+        # BASE REWARD
+        # ==================================================
 
         progress = old_dist - new_dist
 
         reward = 2.0 * progress
 
+        # castigo por no avanzar
         if abs(progress) < 0.01:
             reward -= 0.05
 
+        # pequeño castigo por step
         reward -= 0.01
 
+        # ==================================================
+        # LOOP / STUCK PENALTY
+        # ==================================================
+
+        current_pos = np.array(
+            [self.robot.x, self.robot.y],
+            dtype=np.float32
+        )
+
+        self.position_history.append(current_pos)
+
+        if len(self.position_history) > self.loop_window:
+            self.position_history.pop(0)
+
+        loop_penalty = 0.0
+
+        if len(self.position_history) == self.loop_window:
+
+            positions = np.array(self.position_history)
+
+            movement_span = np.linalg.norm(
+                positions.max(axis=0) - positions.min(axis=0)
+            )
+
+            # si casi no se movió en muchos steps
+            # probablemente está atrapado o girando
+            if movement_span < self.loop_radius:
+                loop_penalty = self.loop_penalty
+                reward -= loop_penalty
+
+        # ==================================================
+        # OBSTACLE DANGER PENALTY
+        # ==================================================
+
         obs = self._get_obs()
-        front_danger = float(max(obs[0], obs[1], obs[6], obs[7]))
+
+        front_danger = float(
+            max(
+                obs[0],
+                obs[1],
+                obs[6],
+                obs[7]
+            )
+        )
+
         reward -= 1.0 * front_danger
+
+        # ==================================================
+        # TERMINAL REWARDS
+        # ==================================================
 
         if collided:
             reward -= 50.0
@@ -147,27 +242,60 @@ class EpuckEnv(gym.Env):
         if reached_goal:
             reward += 100.0
 
-        terminated = bool(reached_goal or out_of_bounds or collided)
-        truncated = bool(timout and not terminated)
+        # ==================================================
+        # DONE FLAGS
+        # ==================================================
 
+        terminated = bool(
+            reached_goal or
+            out_of_bounds or
+            collided
+        )
+
+        truncated = bool(
+            timeout and not terminated
+        )
+
+        # ==================================================
+        # INFO
+        # ==================================================
 
         obs = self._get_obs()
+
         info = self._get_info()
+
         info.update({
             "reached_goal": reached_goal,
             "collided": collided,
             "out_of_bounds": out_of_bounds,
             "distance_to_goal": new_dist,
+            "loop_penalty": loop_penalty,
+            "progress": progress,
         })
+
+        # ==================================================
+        # RENDER
+        # ==================================================
 
         if self.render_mode == "human":
             self.render()
 
         self.prev_dist_to_goal = new_dist
 
-        return obs, float(reward), terminated, truncated, info
-    
+        return (
+            obs,
+            float(reward),
+            terminated,
+            truncated,
+            info
+        )
+
+    # ==================================================
+    # RENDER
+    # ==================================================
+
     def render(self):
+
         if self.renderer is None:
             return None
 
@@ -183,50 +311,83 @@ class EpuckEnv(gym.Env):
             self.renderer.show(frame, delay_ms=1)
 
         return frame
-        
+
+    # ==================================================
+    # CLOSE
+    # ==================================================
+
     def close(self):
-        if self.render_mode == "human" and self.renderer is not None:
+
+        if (
+            self.render_mode == "human"
+            and self.renderer is not None
+        ):
             self.renderer.close()
 
+    # ==================================================
+    # UPDATE SENSORS
+    # ==================================================
+
     def _update_robot_sensors_and_collisions(self):
+
         assert self.robot is not None
 
         for sensor in self.robot.prox_sensors:
-            sensor.updateGlobalPosition(self.robot.x, self.robot.y, self.robot.theta)
+            sensor.updateGlobalPosition(
+                self.robot.x,
+                self.robot.y,
+                self.robot.theta
+            )
 
-        
         for obstacle in self.obstacles:
             self.robot.updateSensors(obstacle)
             self.robot.collisionCheck(obstacle)
 
+    # ==================================================
+    # OBSERVATION
+    # ==================================================
 
     def _get_obs(self):
+
         assert self.robot is not None
 
         sensor_values = []
 
         for sensor in self.robot.prox_sensors:
+
             if sensor.reading < 0:
                 value = 0.0
             else:
-                value = 1.0 - (sensor.reading / sensor.max_range)
-                value = np.clip(value, 0.0, 1.0)
+                value = 1.0 - (
+                    sensor.reading / sensor.max_range
+                )
 
+                value = np.clip(
+                    value,
+                    0.0,
+                    1.0
+                )
 
             sensor_values.append(value)
-
 
         dx = self.goal[0] - self.robot.x
         dy = self.goal[1] - self.robot.y
 
         dist = np.sqrt(dx**2 + dy**2)
-        max_dist = np.sqrt(2.0) * self.arena_size
-        dist_norm = np.clip(dist / max_dist, 0.0, 1.0)
 
+        max_dist = np.sqrt(2.0) * self.arena_size
+
+        dist_norm = np.clip(
+            dist / max_dist,
+            0.0,
+            1.0
+        )
 
         goal_angle = np.arctan2(dy, dx)
-        relative_angle = self._wrap_angle(goal_angle - self.robot.theta)
 
+        relative_angle = self._wrap_angle(
+            goal_angle - self.robot.theta
+        )
 
         obs = np.array(
             [
@@ -239,8 +400,13 @@ class EpuckEnv(gym.Env):
         )
 
         return obs
-    
+
+    # ==================================================
+    # INFO
+    # ==================================================
+
     def _get_info(self) -> dict[str, Any]:
+
         assert self.robot is not None
 
         return {
@@ -249,49 +415,69 @@ class EpuckEnv(gym.Env):
             "robot_theta": self.robot.theta,
             "step_count": self.step_count,
         }
-    
+
+    # ==================================================
+    # DISTANCE TO GOAL
+    # ==================================================
+
     def _distance_to_goal(self) -> float:
+
         assert self.robot is not None
 
         dx = self.goal[0] - self.robot.x
         dy = self.goal[1] - self.robot.y
 
         return np.sqrt(dx**2 + dy**2)
-    
+
+    # ==================================================
+    # ARENA BOUNDS
+    # ==================================================
 
     def _inside_arena(self) -> bool:
 
         r = self.robot.radius
 
         return (
-            r <= self.robot.x <= self.arena_size - r and
+            r <= self.robot.x <= self.arena_size - r
+            and
             r <= self.robot.y <= self.arena_size - r
         )
-    
+
+    # ==================================================
+    # ACTION TO WHEELS
+    # ==================================================
 
     def _action_to_wheels(self, action):
+
         speed = 1.0
         turn_speed = 0.5
 
         if action == 0:  # adelante
             vl, vr = speed, speed
+
         elif action == 1:  # atrás
             vl, vr = -speed, -speed
+
         elif action == 2:  # izquierda
             vl, vr = -turn_speed, turn_speed
+
         elif action == 3:  # derecha
             vl, vr = turn_speed, -turn_speed
 
         else:
-            raise ValueError(f"Acción inválida: {action}")
-        
+            raise ValueError(
+                f"Acción inválida: {action}"
+            )
+
         return vl, vr
-    
+
+    # ==================================================
+    # WRAP ANGLE
+    # ==================================================
+
     @staticmethod
     def _wrap_angle(angle: float) -> float:
-        return np.arctan2(np.sin(angle), np.cos(angle))
-        
-
-    
-
-        
+        return np.arctan2(
+            np.sin(angle),
+            np.cos(angle)
+        )
