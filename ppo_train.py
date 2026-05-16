@@ -75,7 +75,7 @@ def train():
     # TRAIN
     # ==================================================
     model.learn(
-        total_timesteps=300_000,
+        total_timesteps=1_000_000,
         callback=[checkpoint_callback, eval_callback],
         progress_bar=True
     )
