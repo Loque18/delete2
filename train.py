@@ -84,7 +84,7 @@ def train():
     # ==================================================
 
     model.learn(
-        total_timesteps=200_000,
+        total_timesteps=1_000_000,
         callback=[checkpoint_callback, eval_callback],
         progress_bar=True,
     )
