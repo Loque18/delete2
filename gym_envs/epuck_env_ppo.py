@@ -17,7 +17,7 @@ from core.renderer import Cv2Renderer
 from scenes.scene_1 import   scene2, scene3, scene4, scene5
 
 def pick_random_scene(arena_size=200):
-    scenes = [ scene2, scene3, scene4, scene5]
+    scenes = [ scene2, scene3, scene5]
     scene_fn = np.random.choice(scenes)
     return scene_fn(arena_size=arena_size, wall_thickness=2)
 
@@ -128,9 +128,9 @@ class EpuckEnv(gym.Env):
         progress = old_dist - new_dist
 
         reward = 2.0 * progress
-        
+
         if abs(progress) < 0.01:
-            reward -= 0.02
+            reward -= 0.05
 
         reward -= 0.01
 
